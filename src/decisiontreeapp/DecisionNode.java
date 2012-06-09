@@ -17,8 +17,8 @@ public class DecisionNode {
     public HashMap results;     // ubicat en les fulles de l'arbre, indica la
                                 // distribució dels casos que compleixen les 
                                 // condicions dels nodes intermitjos
-    public DecisionNode tb;     // següent node que compleix la condició de divisió
-    public DecisionNode fb;     // següent node que no compleix la condició de divisió
+    public DecisionNode trueBranch;     // següent node que compleix la condició de divisió
+    public DecisionNode falseBranch;     // següent node que no compleix la condició de divisió
 
      /**
      * Constructor per defecte
@@ -29,8 +29,8 @@ public class DecisionNode {
         this.col = -1;
         this.value = null;
         this.results = null;
-        this.tb = null;
-        this.fb = null;
+        this.trueBranch = null;
+        this.falseBranch = null;
     }
 
     /**
@@ -42,8 +42,8 @@ public class DecisionNode {
         this.col = -1;
         this.value = null;
         this.results = results;
-        this.tb = null;
-        this.fb = null;
+        this.trueBranch = null;
+        this.falseBranch = null;
     }
 
     /**
@@ -51,15 +51,15 @@ public class DecisionNode {
      * 
      * @param col Columna tractada en la partició
      * @param value Valor de la columna per on es particiona
-     * @param tb Següent node que compleix la condició de divisió
-     * @param fb Següent node que no compleix la condició de divisió
+     * @param trueBranch Següent node que compleix la condició de divisió
+     * @param falseBranch Següent node que no compleix la condició de divisió
      */
-    public DecisionNode(int col, String value, DecisionNode tb, DecisionNode fb) {
+    public DecisionNode(int col, String value, DecisionNode trueBranch, DecisionNode falseBranch) {
         this.col = col;
         this.value = value;
         this.results = null;
-        this.tb = tb;
-        this.fb = fb;
+        this.trueBranch = trueBranch;
+        this.falseBranch = falseBranch;
     }
 
     /**
@@ -68,15 +68,15 @@ public class DecisionNode {
      * @param col Columna tractada en la partició
      * @param value Valor de la columna per on es particiona
      * @param results Distribució dels casos al recorrer tot l'arbre
-     * @param tb Següent node que compleix la condició de divisió
-     * @param fb Següent node que no compleix la condició de divisió
+     * @param trueBranch Següent node que compleix la condició de divisió
+     * @param falseBranch Següent node que no compleix la condició de divisió
      */
-    public DecisionNode(int col, String value, HashMap results, DecisionNode tb, DecisionNode fb) {
+    public DecisionNode(int col, String value, HashMap results, DecisionNode trueBranch, DecisionNode falseBranch) {
         this.col = col;
         this.value = value;
         this.results = results;
-        this.tb = tb;
-        this.fb = fb;
+        this.trueBranch = trueBranch;
+        this.falseBranch = falseBranch;
     }
 
     /**
@@ -134,28 +134,13 @@ public class DecisionNode {
         ArrayList partition_criteria = null;
         ArrayList partition = null;
         HashMap col_values;
-        HashMap res;
         String val;
-        DecisionNode trueBranch;
-        DecisionNode falseBranch;
-
 
         /* Comprovem quina mesura d'impuresa s'escolleix per a realitzar
          * l'arbre.
          */
-        ImpurityMeasure method = null;
+        ImpurityMeasure method = getMethodByName(scoref);
        
-        if(scoref.equalsIgnoreCase("entropy")){
-            method = new Entropy();
-        }
-        else if(scoref.equalsIgnoreCase("gini_impurity")){
-            method = new GiniImpurity();
-        }
-        else{
-            System.out.println("No existeix aquesta mesura d'impuresa");
-            System.exit(0);                      
-        }
-
         current_score = method.getImpurityScore(this.uniqueCounts(data), data.size());
        
         for(int cols = 0; cols < ((ArrayList)data.get(0)).size(); cols++){
@@ -164,8 +149,7 @@ public class DecisionNode {
             for(int j=0; j<data.size(); j++){
                  if(!col_values.containsKey(((ArrayList)data.get(j)).get(cols))){
                      col_values.put(((ArrayList)data.get(j)).get(cols), 1);
-                 }
-                 
+                 }   
             }
             
             Iterator i = col_values.keySet().iterator();
@@ -192,25 +176,37 @@ public class DecisionNode {
                 }
                 
                 if(result > best_result && ((ArrayList)partition.get(0)).size() > 0 && ((ArrayList)partition.get(1)).size() > 0 ){
-
                     best_result = result;
                     partition_criteria = new ArrayList();
                     partition_criteria.add(cols);
                     partition_criteria.add(val);
-
                 }
             } 
         }
         
         if (best_result > 0.0f){
-            trueBranch = this.buildTree((ArrayList)partition.get(0), scoref, 0.5f);
-            falseBranch = this.buildTree((ArrayList)partition.get(1), scoref, 0.5f);
-            return new DecisionNode(Integer.parseInt(partition_criteria.get(0).toString()), partition_criteria.get(1).toString(), trueBranch, falseBranch);
-        }else{
-            res = this.uniqueCounts(data);            
-            return new DecisionNode(res);
+            DecisionNode tempTrueBranch = this.buildTree((ArrayList)partition.get(0), scoref, 0.5f);
+            DecisionNode tempFalseBranch = this.buildTree((ArrayList)partition.get(1), scoref, 0.5f);
+            return new DecisionNode(Integer.parseInt(partition_criteria.get(0).toString()),
+                    partition_criteria.get(1).toString(), tempTrueBranch, tempFalseBranch);
+        }else{           
+            return new DecisionNode(this.uniqueCounts(data));
         }
 
+    }
+    
+    ImpurityMeasure getMethodByName(String scoref){
+        
+        if(scoref.equalsIgnoreCase("entropy")){
+            return new Entropy();
+        }
+        else if(scoref.equalsIgnoreCase("gini_impurity")){
+            return new GiniImpurity();
+        }
+        else{
+            System.out.println("No existeix aquesta mesura d'impuresa");
+            return null;
+        }
     }
     
     /**
@@ -285,17 +281,17 @@ public class DecisionNode {
      * @param dn DecisionNode arrel de l'arbre
      * @param symbol Caràcter de separació
      */
-    public void printTree(DecisionNode dn, String symbol){
+    public void printTree(String symbol){
 
-        if(dn.results != null){
-            System.out.println(dn.results);
+        if(this.results != null){
+            System.out.println(this.results);
         }else{
-            System.out.println(dn.col+":"+dn.value+"?");
+            System.out.println(this.col+":"+this.value+"?");
             System.out.println(symbol+"T->");
-            this.printTree(dn.tb, symbol+"   ");
+            this.trueBranch.printTree(symbol+"   ");
             System.out.println(symbol+"F->");
-            this.printTree(dn.fb, symbol+"   ");
-        }      
+            this.falseBranch.printTree(symbol+"   ");
+        }    
     }
     
    /**
@@ -326,18 +322,18 @@ public class DecisionNode {
                 float num = Float.parseFloat(value_element);
                 
                 if(num >= Float.parseFloat(tree.value)){
-                    branch = tree.tb;
+                    branch = tree.trueBranch;
                 }
                 else{
-                    branch = tree.fb;
+                    branch = tree.falseBranch;
                 }
             }
             else{
                 if(value_element.equalsIgnoreCase(tree.value)){
-                    branch = tree.tb;
+                    branch = tree.trueBranch;
                 }
                 else{
-                    branch = tree.fb;
+                    branch = tree.falseBranch;
                 }
             }
 
